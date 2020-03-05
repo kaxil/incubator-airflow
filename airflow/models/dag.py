@@ -1399,6 +1399,86 @@ class DAG(BaseDag, LoggingMixin):
         )
         job.run()
 
+    def run_without_schedule(self, mock_variables=None, environment_variables=None):
+        logging.getLogger('airflow.task').propagate = True
+
+        dummy_execution_date = timezone.utcnow()
+        mock_variables = mock_variables or {}
+        environment_variables = environment_variables or {}
+        for env_var, env_val in environment_variables.items():
+            os.environ[env_var] = env_val
+
+        dag_run = DagRun(
+            dag_id=self.dag_id, execution_date=dummy_execution_date, external_trigger=True)
+
+        log.info("Execution Date: %s", dummy_execution_date)
+
+        for task in self.topological_sort():
+            task.log.info("Running Task: %s", task.task_id)
+            ti = TaskInstance(task, dummy_execution_date)
+
+            params = self.params or {}
+            params.update(task.params)
+
+            run_id = ''
+            ds = dummy_execution_date.strftime('%Y-%m-%d')
+            ts = dummy_execution_date.isoformat()
+            yesterday_ds = (dummy_execution_date - timedelta(1)).strftime('%Y-%m-%d')
+            tomorrow_ds = (dummy_execution_date + timedelta(1)).strftime('%Y-%m-%d')
+            prev_execution_date = task.dag.previous_schedule(dummy_execution_date)
+            next_execution_date = task.dag.following_schedule(dummy_execution_date)
+            next_ds = next_execution_date.strftime('%Y-%m-%d')
+            next_ds_nodash = next_ds.replace('-', '')
+            next_execution_date = pendulum.instance(next_execution_date)
+            prev_ds = prev_execution_date.strftime('%Y-%m-%d')
+            prev_ds_nodash = prev_ds.replace('-', '')
+            prev_execution_date = pendulum.instance(prev_execution_date)
+            ds_nodash = ds.replace('-', '')
+            ts_nodash = prev_execution_date.strftime('%Y%m%dT%H%M%S')
+            ts_nodash_with_tz = ts.replace('-', '').replace(':', '')
+            yesterday_ds_nodash = yesterday_ds.replace('-', '')
+            tomorrow_ds_nodash = tomorrow_ds.replace('-', '')
+
+            ti_key_str = "{dag_id}__{task_id}__{ds_nodash}".format(
+                dag_id=task.dag_id, task_id=task.task_id, ds_nodash=ds_nodash)
+
+            example_context = {
+                'conf': conf,
+                'dag': task.dag,
+                'dag_run': dag_run,
+                'ds': dummy_execution_date,
+                'ds_nodash': ds_nodash,
+                'execution_date': pendulum.instance(dummy_execution_date),
+                'inlets': task.inlets,
+                'next_ds': next_ds,
+                'next_ds_nodash': next_ds_nodash,
+                'next_execution_date': next_execution_date,
+                'outlets': task.outlets,
+                'params': params,
+                'prev_ds': prev_ds,
+                'prev_ds_nodash': prev_ds_nodash,
+                'prev_execution_date': prev_execution_date,
+                'run_id': run_id,
+                'task': task,
+                'task_instance': ti,
+                'task_instance_key_str': ti_key_str,
+                'ti': ti,
+                'tomorrow_ds': tomorrow_ds,
+                'tomorrow_ds_nodash': tomorrow_ds_nodash,
+                'ts': ts,
+                'ts_nodash': ts_nodash,
+                'ts_nodash_with_tz': ts_nodash_with_tz,
+                'var': {
+                    'json': mock_variables,
+                    'value': mock_variables,
+                },
+                'yesterday_ds': yesterday_ds,
+                'yesterday_ds_nodash': yesterday_ds_nodash,
+            }
+            task.render_template_fields(context=example_context)
+            task.execute(example_context)
+            task.log.info("Execution Completed for Task: %s", task.task_id)
+
     def cli(self):
         """
         Exposes a CLI specific to this DAG

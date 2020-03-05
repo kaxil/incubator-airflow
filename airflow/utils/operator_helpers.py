@@ -46,6 +46,9 @@ def context_to_airflow_vars(context, in_env_var_format=False):
     :type in_env_var_format: bool
     :return: task_instance context as dict.
     """
+    if context is None:
+        return {}
+
     params = dict()
     if in_env_var_format:
         name_format = 'env_var_format'
