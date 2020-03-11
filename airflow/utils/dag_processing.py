@@ -42,6 +42,7 @@ from airflow.jobs.local_task_job import LocalTaskJob as LJ
 from airflow.models import errors
 from airflow.models.dag import DAG
 from airflow.models.taskinstance import SimpleTaskInstance, TaskInstance
+from airflow.serialization.serialized_objects import SerializedDAG
 from airflow.settings import STORE_SERIALIZED_DAGS
 from airflow.stats import Stats
 from airflow.utils import timezone
@@ -57,7 +58,7 @@ class SimpleDagBag(BaseDagBag):
     A collection of SimpleDag objects with some convenience methods.
     """
 
-    def __init__(self, simple_dags: List[DAG]):
+    def __init__(self, simple_dags: List[str]):
         """
         Constructor.
 
@@ -68,7 +69,8 @@ class SimpleDagBag(BaseDagBag):
         self.dag_id_to_simple_dag: Dict[str, DAG] = {}
 
         for simple_dag in simple_dags:
-            self.dag_id_to_simple_dag[simple_dag.dag_id] = simple_dag
+            serialized_dag: DAG = SerializedDAG.from_json(simple_dag)   # type: ignore
+            self.dag_id_to_simple_dag[serialized_dag.dag_id] = serialized_dag
 
     @property
     def dag_ids(self) -> KeysView[str]:

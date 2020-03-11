@@ -42,8 +42,8 @@ from airflow.executors.sequential_executor import SequentialExecutor
 from airflow.jobs.base_job import BaseJob
 from airflow.models import DAG, DagModel, SlaMiss, errors
 from airflow.models.dagrun import DagRun
-from airflow.models.serialized_dag import SerializedDagModel
 from airflow.models.taskinstance import SimpleTaskInstance, TaskInstanceKeyType
+from airflow.serialization.serialized_objects import SerializedDAG
 from airflow.stats import Stats
 from airflow.ti_deps.dep_context import DepContext
 from airflow.ti_deps.dependencies import SCHEDULED_DEPS
@@ -800,7 +800,7 @@ class DagFileProcessor(LoggingMixin):
     @provide_session
     def process_file(
         self, file_path, failure_callback_requests, pickle_dags=False, session=None
-    ) -> Tuple[List[DAG], int]:
+    ) -> Tuple[List[str], int]:
         """
         Process a Python file containing Airflow DAGs.
 
@@ -826,7 +826,7 @@ class DagFileProcessor(LoggingMixin):
         :type pickle_dags: bool
         :return: a tuple with list of SimpleDags made from the Dags found in the file and
             count of import errors.
-        :rtype: Tuple[List[SimpleDag], int]
+        :rtype: Tuple[List[str], int]
         """
         self.log.info("Processing file %s for tasks to queue", file_path)
         # As DAGs are parsed from this file, they will be converted into SimpleDags
@@ -860,7 +860,7 @@ class DagFileProcessor(LoggingMixin):
         for dag_id, dag in dagbag.dags.items():
             # Only return DAGs that are not paused
             if dag_id not in paused_dag_ids:
-                simple_dags.append(SerializedDagModel(dag).dag)
+                simple_dags.append(SerializedDAG.to_json(dag))
                 # TODO: Remove pickle_dags from below line
                 self.log.debug(pickle_dags)
 
@@ -1221,8 +1221,11 @@ class SchedulerJob(BaseJob):
                     )
                     continue
 
-                task_concurrency_limit = simple_dag.get_task(
-                    task_instance.task_id).task_concurrency
+                task_concurrency_limit = None
+                if simple_dag.has_task(task_instance.task_id):
+                    task_concurrency_limit = simple_dag.get_task(
+                        task_instance.task_id).task_concurrency
+
                 if task_concurrency_limit is not None:
                     current_task_concurrency = task_concurrency_map[
                         (task_instance.dag_id, task_instance.task_id)
