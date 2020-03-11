@@ -1240,7 +1240,7 @@ class TestSchedulerJob(unittest.TestCase):
         scheduler.run()
 
     def _make_simple_dag_bag(self, dags):
-        return SimpleDagBag([SerializedDagModel(dag) for dag in dags])
+        return SimpleDagBag([SerializedDagModel(dag).dag for dag in dags])
 
     def test_no_orphan_process_will_be_left(self):
         empty_dir = mkdtemp()
