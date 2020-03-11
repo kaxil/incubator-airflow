@@ -40,11 +40,12 @@ from airflow.jobs.backfill_job import BackfillJob
 from airflow.jobs.scheduler_job import DagFileProcessor, SchedulerJob
 from airflow.models import DAG, DagBag, DagModel, Pool, SlaMiss, TaskInstance, errors
 from airflow.models.dagrun import DagRun
+from airflow.models.serialized_dag import SerializedDagModel
 from airflow.models.taskinstance import SimpleTaskInstance
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.utils import timezone
-from airflow.utils.dag_processing import FailureCallbackRequest, SimpleDag, SimpleDagBag
+from airflow.utils.dag_processing import FailureCallbackRequest, SimpleDagBag
 from airflow.utils.dates import days_ago
 from airflow.utils.file import list_py_file_paths
 from airflow.utils.session import create_session, provide_session
@@ -1239,7 +1240,7 @@ class TestSchedulerJob(unittest.TestCase):
         scheduler.run()
 
     def _make_simple_dag_bag(self, dags):
-        return SimpleDagBag([SimpleDag(dag) for dag in dags])
+        return SimpleDagBag([SerializedDagModel(dag) for dag in dags])
 
     def test_no_orphan_process_will_be_left(self):
         empty_dir = mkdtemp()

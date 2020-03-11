@@ -42,6 +42,7 @@ from airflow.executors.sequential_executor import SequentialExecutor
 from airflow.jobs.base_job import BaseJob
 from airflow.models import DAG, DagModel, SlaMiss, errors
 from airflow.models.dagrun import DagRun
+from airflow.models.serialized_dag import SerializedDagModel
 from airflow.models.taskinstance import SimpleTaskInstance, TaskInstanceKeyType
 from airflow.stats import Stats
 from airflow.ti_deps.dep_context import DepContext
@@ -49,7 +50,7 @@ from airflow.ti_deps.dependencies import SCHEDULED_DEPS
 from airflow.ti_deps.deps.pool_slots_available_dep import STATES_TO_COUNT_AS_RUNNING
 from airflow.utils import asciiart, helpers, timezone
 from airflow.utils.dag_processing import (
-    AbstractDagFileProcessorProcess, DagFileProcessorAgent, FailureCallbackRequest, SimpleDag, SimpleDagBag,
+    AbstractDagFileProcessorProcess, DagFileProcessorAgent, FailureCallbackRequest, SimpleDagBag,
 )
 from airflow.utils.email import get_email_address_list, send_email
 from airflow.utils.log.logging_mixin import LoggingMixin, StreamLogWriter, set_context
@@ -287,7 +288,7 @@ class DagFileProcessorProcess(AbstractDagFileProcessorProcess, LoggingMixin):
     def result(self):
         """
         :return: result of running SchedulerJob.process_file()
-        :rtype: airflow.utils.dag_processing.SimpleDag
+        :rtype: airflow.models.serialized_dag.SerializedDagModelSimpleDag
         """
         if not self.done:
             raise AirflowException("Tried to get the result before it's done!")
@@ -799,7 +800,7 @@ class DagFileProcessor(LoggingMixin):
     @provide_session
     def process_file(
         self, file_path, failure_callback_requests, pickle_dags=False, session=None
-    ) -> Tuple[List[SimpleDag], int]:
+    ) -> Tuple[List[SerializedDagModel], int]:
         """
         Process a Python file containing Airflow DAGs.
 
@@ -855,14 +856,13 @@ class DagFileProcessor(LoggingMixin):
 
         paused_dag_ids = DagModel.get_paused_dag_ids(dag_ids=dagbag.dag_ids)
 
-        # Pickle the DAGs (if necessary) and put them into a SimpleDag
+        # Serialize the DAGs
         for dag_id, dag in dagbag.dags.items():
             # Only return DAGs that are not paused
             if dag_id not in paused_dag_ids:
-                pickle_id = None
-                if pickle_dags:
-                    pickle_id = dag.pickle(session).id
-                simple_dags.append(SimpleDag(dag, pickle_id=pickle_id))
+                simple_dags.append(SerializedDagModel(dag))
+                # TODO: Remove pickle_dags from below line
+                self.log.debug(pickle_dags)
 
         dags = self._find_dags_to_process(dagbag.dags.values(), paused_dag_ids)
 
@@ -1221,9 +1221,8 @@ class SchedulerJob(BaseJob):
                     )
                     continue
 
-                task_concurrency_limit = simple_dag.get_task_special_arg(
-                    task_instance.task_id,
-                    'task_concurrency')
+                task_concurrency_limit = simple_dag.get_task(
+                    task_instance.task_id).task_concurrency
                 if task_concurrency_limit is not None:
                     current_task_concurrency = task_concurrency_map[
                         (task_instance.dag_id, task_instance.task_id)
