@@ -1240,7 +1240,7 @@ class TestSchedulerJob(unittest.TestCase):
         scheduler.run()
 
     def _make_simple_dag_bag(self, dags):
-        return SimpleDagBag([SerializedDAG.to_json(dag) for dag in dags])
+        return SimpleDagBag([SerializedDAG.to_dict(dag) for dag in dags])
 
     def test_no_orphan_process_will_be_left(self):
         empty_dir = mkdtemp()
@@ -2139,7 +2139,7 @@ class TestSchedulerJob(unittest.TestCase):
         executor.queued_tasks
         scheduler.executor = executor
         processor = mock.MagicMock()
-        processor.harvest_simple_dags.return_value = [SerializedDAG.to_json(dag)]
+        processor.harvest_simple_dags.return_value = [SerializedDAG.to_dict(dag)]
         processor.done = True
         scheduler.processor_agent = processor
 

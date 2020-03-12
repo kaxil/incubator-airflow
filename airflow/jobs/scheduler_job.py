@@ -288,7 +288,7 @@ class DagFileProcessorProcess(AbstractDagFileProcessorProcess, LoggingMixin):
     def result(self):
         """
         :return: result of running SchedulerJob.process_file()
-        :rtype: airflow.models.dag.DAG
+        :rtype: airflow.serialization.serialized_objects.SerializedDAG
         """
         if not self.done:
             raise AirflowException("Tried to get the result before it's done!")
@@ -800,7 +800,7 @@ class DagFileProcessor(LoggingMixin):
     @provide_session
     def process_file(
         self, file_path, failure_callback_requests, pickle_dags=False, session=None
-    ) -> Tuple[List[str], int]:
+    ) -> Tuple[List[dict], int]:
         """
         Process a Python file containing Airflow DAGs.
 
@@ -826,7 +826,7 @@ class DagFileProcessor(LoggingMixin):
         :type pickle_dags: bool
         :return: a tuple with list of SimpleDags made from the Dags found in the file and
             count of import errors.
-        :rtype: Tuple[List[str], int]
+        :rtype: Tuple[List[SerializedDAG], int]
         """
         self.log.info("Processing file %s for tasks to queue", file_path)
         # As DAGs are parsed from this file, they will be converted into SimpleDags
@@ -860,7 +860,7 @@ class DagFileProcessor(LoggingMixin):
         for dag_id, dag in dagbag.dags.items():
             # Only return DAGs that are not paused
             if dag_id not in paused_dag_ids:
-                simple_dags.append(SerializedDAG.to_json(dag))
+                simple_dags.append(SerializedDAG.to_dict(dag))
                 # TODO: Remove pickle_dags from below line
                 self.log.debug(pickle_dags)
 

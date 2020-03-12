@@ -40,7 +40,6 @@ from airflow.dag.base_dag import BaseDagBag
 from airflow.exceptions import AirflowException
 from airflow.jobs.local_task_job import LocalTaskJob as LJ
 from airflow.models import errors
-from airflow.models.dag import DAG
 from airflow.models.taskinstance import SimpleTaskInstance, TaskInstance
 from airflow.serialization.serialized_objects import SerializedDAG
 from airflow.settings import STORE_SERIALIZED_DAGS
@@ -58,7 +57,7 @@ class SimpleDagBag(BaseDagBag):
     A collection of SimpleDag objects with some convenience methods.
     """
 
-    def __init__(self, simple_dags: List[str]):
+    def __init__(self, simple_dags: List[dict]):
         """
         Constructor.
 
@@ -66,10 +65,10 @@ class SimpleDagBag(BaseDagBag):
         :type simple_dags: list[airflow.models.dag.DAG]
         """
         self.simple_dags = simple_dags
-        self.dag_id_to_simple_dag: Dict[str, DAG] = {}
+        self.dag_id_to_simple_dag: Dict[str, SerializedDAG] = {}
 
         for simple_dag in simple_dags:
-            serialized_dag: DAG = SerializedDAG.from_json(simple_dag)   # type: ignore
+            serialized_dag = SerializedDAG.from_dict(simple_dag)
             self.dag_id_to_simple_dag[serialized_dag.dag_id] = serialized_dag
 
     @property
@@ -80,13 +79,13 @@ class SimpleDagBag(BaseDagBag):
         """
         return self.dag_id_to_simple_dag.keys()
 
-    def get_dag(self, dag_id: str) -> DAG:
+    def get_dag(self, dag_id: str) -> SerializedDAG:
         """
         :param dag_id: DAG ID
         :type dag_id: unicode
         :return: if the given DAG ID exists in the bag, return the BaseDag
         corresponding to that ID. Otherwise, throw an Exception
-        :rtype: airflow.models.dag.DAG
+        :rtype: SerializedDAG
         """
         if dag_id not in self.dag_id_to_simple_dag:
             raise AirflowException("Unknown DAG ID {}".format(dag_id))
@@ -142,12 +141,12 @@ class AbstractDagFileProcessorProcess(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def result(self) -> Tuple[List[DAG], int]:
+    def result(self) -> Tuple[List[SerializedDAG], int]:
         """
         A list of simple dags found, and the number of import errors
 
         :return: result of running SchedulerJob.process_file()
-        :rtype: tuple[list[airflow.models.dag.DAG], int]
+        :rtype: tuple[list[SerializedDAG], int]
         """
         raise NotImplementedError()
 
@@ -918,7 +917,7 @@ class DagFileProcessorManager(LoggingMixin):  # pylint: disable=too-many-instanc
 
         :return: a list of SimpleDags that were produced by processors that
             have finished since the last time this was called
-        :rtype: list[airflow.models.dag.DAG]
+        :rtype: list[SerializedDAG
         """
         finished_processors: Dict[str, AbstractDagFileProcessorProcess] = {}
         running_processors: Dict[str, AbstractDagFileProcessorProcess] = {}
