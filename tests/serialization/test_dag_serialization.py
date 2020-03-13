@@ -40,6 +40,7 @@ from tests.test_utils.mock_operators import CustomOperator, CustomOpLink, Google
 serialized_simple_dag_ground_truth = {
     "__version": 1,
     "dag": {
+        "_full_filepath": "",
         "default_args": {
             "__type": "dict",
             "__var": {
